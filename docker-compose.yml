@@ -1,0 +1,13 @@
+version: "3.9"
+services:
+  docservice:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/data/chroma
+    environment:
+      - CHROMA_PERSIST_DIR=/data/chroma
+
+volumes:
+  chroma_data:
