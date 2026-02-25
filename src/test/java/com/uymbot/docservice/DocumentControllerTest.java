@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.uymbot.docservice.dto.DocumentRequest;
 import com.uymbot.docservice.dto.DocumentResponse;
 import com.uymbot.docservice.dto.DocumentUpdateRequest;
+import com.uymbot.docservice.dto.RagImportRequest;
 import com.uymbot.docservice.dto.SearchRequest;
 import com.uymbot.docservice.exception.DocumentNotFoundException;
 import com.uymbot.docservice.service.DocumentService;
@@ -164,5 +165,59 @@ class DocumentControllerTest {
         mockMvc.perform(get("/documents/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ok"));
+    }
+
+    // ─── IMPORT FROM RAG ─────────────────────────────────────────────────────
+
+    @Test
+    void importFromRag_withBody_returns201() throws Exception {
+        String ragId = UUID.randomUUID().toString();
+        RagImportRequest req = RagImportRequest.builder()
+                .title("Imported Title")
+                .metadata(Map.of("source", "rag"))
+                .joinSeparator("\n")
+                .build();
+        DocumentResponse imported = DocumentResponse.builder()
+                .id(ID).title("Imported Title").content("chunk1\nchunk2")
+                .metadata(Map.of("ragDocumentId", ragId, "importedFrom", "rag"))
+                .build();
+        given(documentService.importFromRag(eq(ragId), any())).willReturn(imported);
+
+        mockMvc.perform(post("/documents/import/rag/{ragDocumentId}", ragId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(ID))
+                .andExpect(jsonPath("$.title").value("Imported Title"));
+    }
+
+    @Test
+    void importFromRag_noBody_returns201() throws Exception {
+        String ragId = UUID.randomUUID().toString();
+        DocumentResponse imported = DocumentResponse.builder()
+                .id(ID).title("file.pdf").content("some content")
+                .metadata(Map.of("ragDocumentId", ragId, "importedFrom", "rag"))
+                .build();
+        given(documentService.importFromRag(eq(ragId), any())).willReturn(imported);
+
+        mockMvc.perform(post("/documents/import/rag/{ragDocumentId}", ragId))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(ID));
+    }
+
+    @Test
+    void importFromRag_ragServiceError_returns500() throws Exception {
+        String ragId = UUID.randomUUID().toString();
+        given(documentService.importFromRag(eq(ragId), any()))
+                .willThrow(new RuntimeException("RAG service unavailable"));
+
+        mockMvc.perform(post("/documents/import/rag/{ragDocumentId}", ragId))
+                .andExpect(status().isInternalServerError());
+    }
+
+    @Test
+    void importFromRag_invalidUuid_returns400() throws Exception {
+        mockMvc.perform(post("/documents/import/rag/{ragDocumentId}", "not-a-valid-uuid"))
+                .andExpect(status().isBadRequest());
     }
 }
