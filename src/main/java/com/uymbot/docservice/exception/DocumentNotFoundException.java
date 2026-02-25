@@ -1,0 +1,7 @@
+package com.uymbot.docservice.exception;
+
+public class DocumentNotFoundException extends RuntimeException {
+    public DocumentNotFoundException(String id) {
+        super("Document not found with id: " + id);
+    }
+}

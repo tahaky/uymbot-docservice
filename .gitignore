@@ -1,6 +1,14 @@
-__pycache__/
-*.pyc
-*.pyo
-.pytest_cache/
-chroma_db/
-.env
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
