@@ -3,6 +3,7 @@ package com.uymbot.docservice.controller;
 import com.uymbot.docservice.dto.DocumentRequest;
 import com.uymbot.docservice.dto.DocumentResponse;
 import com.uymbot.docservice.dto.DocumentUpdateRequest;
+import com.uymbot.docservice.dto.RagImportRequest;
 import com.uymbot.docservice.dto.SearchRequest;
 import com.uymbot.docservice.service.DocumentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
@@ -86,6 +88,21 @@ public class DocumentController {
     @ApiResponse(responseCode = "200", description = "Search results")
     public List<DocumentResponse> search(@Valid @RequestBody SearchRequest req) {
         return documentService.search(req.getQuery(), req.getNResults());
+    }
+
+    // ------------------------------------------------------------ IMPORT FROM RAG
+    @PostMapping("/import/rag/{ragDocumentId}")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Import a document from the RAG Chunking/Parser service",
+               description = "Fetches document metadata and chunks from the RAG service, "
+                       + "joins them into a single document, and stores it in ChromaDB.")
+    @ApiResponse(responseCode = "201", description = "Document imported and stored")
+    @ApiResponse(responseCode = "502", description = "RAG service unreachable or returned an error")
+    public DocumentResponse importFromRag(
+            @Parameter(description = "UUID of the document in the RAG service")
+            @PathVariable @Pattern(regexp = "^[0-9a-fA-F-]{36}$", message = "ragDocumentId must be a valid UUID") String ragDocumentId,
+            @RequestBody(required = false) RagImportRequest req) {
+        return documentService.importFromRag(ragDocumentId, req != null ? req : new RagImportRequest());
     }
 
     // ------------------------------------------------------------------ HEALTH

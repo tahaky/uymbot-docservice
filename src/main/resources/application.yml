@@ -5,6 +5,10 @@ chromadb:
   host: ${CHROMADB_HOST:http://localhost:8001}
   collection-name: documents
 
+rag:
+  service:
+    base-url: ${RAG_SERVICE_BASE_URL:http://localhost:9090}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

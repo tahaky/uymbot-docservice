@@ -3,11 +3,15 @@ package com.uymbot.docservice.service;
 import com.uymbot.docservice.dto.DocumentRequest;
 import com.uymbot.docservice.dto.DocumentResponse;
 import com.uymbot.docservice.dto.DocumentUpdateRequest;
+import com.uymbot.docservice.dto.RagChunkResponse;
+import com.uymbot.docservice.dto.RagDocumentMeta;
+import com.uymbot.docservice.dto.RagImportRequest;
 import com.uymbot.docservice.exception.DocumentNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +21,7 @@ public class DocumentService {
 
     private final ChromaDbService chromaDbService;
     private final EmbeddingService embeddingService;
+    private final RagClient ragClient;
 
     // ------------------------------------------------------------------ CREATE
     public DocumentResponse create(DocumentRequest req) {
@@ -68,6 +73,32 @@ public class DocumentService {
     public void delete(String id) {
         getById(id);  // throws 404 if not found
         chromaDbService.delete(id);
+    }
+
+    // ----------------------------------------------------------------- IMPORT FROM RAG
+    public DocumentResponse importFromRag(String ragDocumentId, RagImportRequest req) {
+        RagDocumentMeta ragDoc = ragClient.getDocument(ragDocumentId);
+        List<RagChunkResponse> chunks = ragClient.getChunks(ragDocumentId);
+
+        String separator = req.getJoinSeparator() != null ? req.getJoinSeparator() : "\n\n";
+        String content = chunks.stream()
+                .map(c -> c.getText() != null ? c.getText() : "")
+                .collect(Collectors.joining(separator));
+
+        String title = req.getTitle() != null ? req.getTitle()
+                : (ragDoc != null && ragDoc.getFilename() != null ? ragDoc.getFilename() : "RAG Document");
+
+        Map<String, Object> mergedMeta = new HashMap<>();
+        if (req.getMetadata() != null) mergedMeta.putAll(req.getMetadata());
+        mergedMeta.put("ragDocumentId", ragDocumentId);
+        if (ragDoc != null && ragDoc.getFilename() != null) mergedMeta.put("ragFilename", ragDoc.getFilename());
+        mergedMeta.put("importedFrom", "rag");
+
+        return create(DocumentRequest.builder()
+                .title(title)
+                .content(content)
+                .metadata(mergedMeta)
+                .build());
     }
 
     // ------------------------------------------------------------------ SEARCH
