@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+
+  chromadb:
+    image: chromadb/chroma:0.5.23
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - ANONYMIZED_TELEMETRY=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  docservice:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - CHROMADB_HOST=http://chromadb:8000
+    depends_on:
+      chromadb:
+        condition: service_healthy
+    restart: on-failure
+
+volumes:
+  chroma_data:

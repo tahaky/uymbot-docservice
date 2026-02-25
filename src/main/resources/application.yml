@@ -1,0 +1,12 @@
+server:
+  port: 8080
+
+chromadb:
+  host: ${CHROMADB_HOST:http://localhost:8001}
+  collection-name: documents
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /api-docs
