@@ -7,7 +7,7 @@ chromadb:
 
 rag:
   service:
-    base-url: ${RAG_SERVICE_BASE_URL:http://localhost:9090}
+    base-url: ${RAG_SERVICE_BASE_URL:http://192.168.2.37:8082}
 
 springdoc:
   swagger-ui:
