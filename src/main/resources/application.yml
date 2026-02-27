@@ -13,6 +13,7 @@ openai:
   api-key: ${OPENAI_API_KEY:}
   embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
   embedding-url: https://api.openai.com/v1/embeddings
+  chunk-size: ${OPENAI_CHUNK_SIZE:1000}
 
 springdoc:
   swagger-ui:

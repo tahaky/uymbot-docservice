@@ -35,10 +35,11 @@ public class DocumentController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create a new document",
-               description = "Embeds the content and stores the document in ChromaDB.")
-    @ApiResponse(responseCode = "201", description = "Document created")
+               description = "Splits the content into optimal embedding chunks, embeds each chunk, "
+                       + "and stores them in ChromaDB. Returns one entry per chunk.")
+    @ApiResponse(responseCode = "201", description = "Document chunks created")
     @ApiResponse(responseCode = "400", description = "Validation error")
-    public DocumentResponse create(@Valid @RequestBody DocumentRequest req) {
+    public List<DocumentResponse> create(@Valid @RequestBody DocumentRequest req) {
         return documentService.create(req);
     }
 
@@ -95,10 +96,10 @@ public class DocumentController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Import a document from the RAG Chunking/Parser service",
                description = "Fetches document metadata and chunks from the RAG service, "
-                       + "joins them into a single document, and stores it in ChromaDB.")
-    @ApiResponse(responseCode = "201", description = "Document imported and stored")
+                       + "joins them, splits into optimal embedding chunks, and stores them in ChromaDB.")
+    @ApiResponse(responseCode = "201", description = "Document chunks imported and stored")
     @ApiResponse(responseCode = "502", description = "RAG service unreachable or returned an error")
-    public DocumentResponse importFromRag(
+    public List<DocumentResponse> importFromRag(
             @Parameter(description = "UUID of the document in the RAG service")
             @PathVariable @Pattern(regexp = "^[0-9a-fA-F-]{36}$", message = "ragDocumentId must be a valid UUID") String ragDocumentId,
             @RequestBody(required = false) RagImportRequest req) {

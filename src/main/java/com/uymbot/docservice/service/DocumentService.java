@@ -8,33 +8,63 @@ import com.uymbot.docservice.dto.RagDocumentMeta;
 import com.uymbot.docservice.dto.RagImportRequest;
 import com.uymbot.docservice.exception.DocumentNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DocumentService {
 
     private static final String TITLE_KEY = "_title";
+    private static final String CHUNK_INDEX_KEY = "chunkIndex";
+    private static final String TOTAL_CHUNKS_KEY = "totalChunks";
 
     private final ChromaDbService chromaDbService;
     private final EmbeddingService embeddingService;
     private final RagClient ragClient;
+    private final TextChunkingService textChunkingService;
 
     // ------------------------------------------------------------------ CREATE
-    public DocumentResponse create(DocumentRequest req) {
-        String id = UUID.randomUUID().toString();
-        Map<String, Object> meta = buildMeta(req.getTitle(), req.getMetadata());
-        float[] embedding = embeddingService.embed(req.getContent());
-        chromaDbService.add(id, req.getContent(), meta, embedding);
-        return DocumentResponse.builder()
-                .id(id)
-                .title(req.getTitle())
-                .content(req.getContent())
-                .metadata(req.getMetadata() == null ? Map.of() : req.getMetadata())
-                .build();
+    /**
+     * Splits the document content into optimal chunks for OpenAI embeddings,
+     * embeds each chunk, and stores them all in ChromaDB.
+     *
+     * @return one {@link DocumentResponse} per chunk
+     */
+    public List<DocumentResponse> create(DocumentRequest req) {
+        List<String> chunks = textChunkingService.split(req.getContent());
+        int totalChunks = chunks.size();
+        log.debug("Creating document '{}' as {} chunk(s)", req.getTitle(), totalChunks);
+
+        List<DocumentResponse> responses = new ArrayList<>(totalChunks);
+        for (int i = 0; i < totalChunks; i++) {
+            String chunkText = chunks.get(i);
+            String chunkId = UUID.randomUUID().toString();
+
+            Map<String, Object> meta = buildMeta(req.getTitle(), req.getMetadata());
+            meta.put(CHUNK_INDEX_KEY, i);
+            meta.put(TOTAL_CHUNKS_KEY, totalChunks);
+
+            float[] embedding = embeddingService.embed(chunkText);
+            chromaDbService.add(chunkId, chunkText, meta, embedding);
+
+            Map<String, Object> responseMetadata = new HashMap<>(
+                    req.getMetadata() == null ? Map.of() : req.getMetadata());
+            responseMetadata.put(CHUNK_INDEX_KEY, i);
+            responseMetadata.put(TOTAL_CHUNKS_KEY, totalChunks);
+
+            responses.add(DocumentResponse.builder()
+                    .id(chunkId)
+                    .title(req.getTitle())
+                    .content(chunkText)
+                    .metadata(responseMetadata)
+                    .build());
+        }
+        return responses;
     }
 
     // -------------------------------------------------------------------- READ
@@ -76,7 +106,7 @@ public class DocumentService {
     }
 
     // ----------------------------------------------------------------- IMPORT FROM RAG
-    public DocumentResponse importFromRag(String ragDocumentId, RagImportRequest req) {
+    public List<DocumentResponse> importFromRag(String ragDocumentId, RagImportRequest req) {
         RagDocumentMeta ragDoc = ragClient.getDocument(ragDocumentId);
         List<RagChunkResponse> chunks = ragClient.getChunks(ragDocumentId);
 
