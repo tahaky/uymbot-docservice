@@ -9,6 +9,11 @@ rag:
   service:
     base-url: ${RAG_SERVICE_BASE_URL:http://192.168.2.37:8082}
 
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+  embedding-url: https://api.openai.com/v1/embeddings
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
