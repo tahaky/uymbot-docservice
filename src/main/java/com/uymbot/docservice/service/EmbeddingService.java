@@ -1,50 +1,76 @@
 package com.uymbot.docservice.service;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.util.List;
+import java.util.Map;
 
 /**
- * Deterministic, offline hash-based text embedding.
- * Produces a 384-dimensional L2-normalised float vector from character tri-grams.
- * Suitable for local/offline use and testing.
- * For production, replace with a sentence-transformer model or external API.
+ * OpenAI-backed text embedding service.
+ * Calls the OpenAI /v1/embeddings endpoint to produce semantic float vectors.
  */
+@Slf4j
 @Service
 public class EmbeddingService {
 
-    private static final int DIM = 384;
+    private final RestTemplate restTemplate;
 
+    @Value("${openai.api-key}")
+    private String apiKey;
+
+    @Value("${openai.embedding-model}")
+    private String model;
+
+    @Value("${openai.embedding-url}")
+    private String embeddingUrl;
+
+    public EmbeddingService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
+
+    @SuppressWarnings("unchecked")
     public float[] embed(String text) {
-        float[] vec = new float[DIM];
+        if (text == null || text.isBlank()) {
+            throw new IllegalArgumentException("Text to embed must not be null or blank");
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+
+        Map<String, Object> requestBody = Map.of("input", text, "model", model);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+        Map<?, ?> response;
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            int len = text.length();
-            for (int i = 0; i < len - 2; i++) {
-                byte[] ngram = text.substring(i, i + 3).getBytes(StandardCharsets.UTF_8);
-                byte[] hash = digest.digest(ngram);
-                for (int j = 0; j + 3 < hash.length; j += 4) {
-                    int idx = (j / 4) % DIM;
-                    float val = ByteBuffer.wrap(hash, j, 4).order(ByteOrder.BIG_ENDIAN).getFloat();
-                    if (!Float.isNaN(val) && !Float.isInfinite(val)) {
-                        vec[idx] += val;
-                    }
-                }
-            }
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
+            response = restTemplate.postForObject(embeddingUrl, entity, Map.class);
+        } catch (Exception e) {
+            throw new IllegalStateException("OpenAI embedding API call failed: " + e.getMessage(), e);
         }
-        // L2 normalise
-        float norm = 0f;
-        for (float v : vec) norm += v * v;
-        norm = (float) Math.sqrt(norm);
-        if (norm > 0f) {
-            for (int i = 0; i < DIM; i++) vec[i] /= norm;
+
+        if (response == null) {
+            throw new IllegalStateException("OpenAI embedding API returned null response");
         }
-        return vec;
+        List<?> data = (List<?>) response.get("data");
+        if (data == null || data.isEmpty()) {
+            throw new IllegalStateException("OpenAI embedding API returned no data");
+        }
+        List<Double> embeddingValues = (List<Double>) ((Map<?, ?>) data.get(0)).get("embedding");
+        if (embeddingValues == null || embeddingValues.isEmpty()) {
+            throw new IllegalStateException("OpenAI embedding API returned empty embedding vector");
+        }
+
+        float[] result = new float[embeddingValues.size()];
+        for (int i = 0; i < embeddingValues.size(); i++) {
+            result[i] = embeddingValues.get(i).floatValue();
+        }
+        log.debug("Embedded text with model={}, dim={}", model, result.length);
+        return result;
     }
 }
