@@ -50,14 +50,14 @@ class DocumentControllerTest {
     @Test
     void createDocument_returns201() throws Exception {
         DocumentRequest req = new DocumentRequest("Test Title", "Test content", Map.of("source", "unit-test"));
-        given(documentService.create(any())).willReturn(sampleResponse());
+        given(documentService.create(any())).willReturn(List.of(sampleResponse()));
 
         mockMvc.perform(post("/documents")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(ID))
-                .andExpect(jsonPath("$.title").value("Test Title"));
+                .andExpect(jsonPath("$[0].id").value(ID))
+                .andExpect(jsonPath("$[0].title").value("Test Title"));
     }
 
     @Test
@@ -181,14 +181,14 @@ class DocumentControllerTest {
                 .id(ID).title("Imported Title").content("chunk1\nchunk2")
                 .metadata(Map.of("ragDocumentId", ragId, "importedFrom", "rag"))
                 .build();
-        given(documentService.importFromRag(eq(ragId), any())).willReturn(imported);
+        given(documentService.importFromRag(eq(ragId), any())).willReturn(List.of(imported));
 
         mockMvc.perform(post("/documents/import/rag/{ragDocumentId}", ragId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(ID))
-                .andExpect(jsonPath("$.title").value("Imported Title"));
+                .andExpect(jsonPath("$[0].id").value(ID))
+                .andExpect(jsonPath("$[0].title").value("Imported Title"));
     }
 
     @Test
@@ -198,11 +198,11 @@ class DocumentControllerTest {
                 .id(ID).title("file.pdf").content("some content")
                 .metadata(Map.of("ragDocumentId", ragId, "importedFrom", "rag"))
                 .build();
-        given(documentService.importFromRag(eq(ragId), any())).willReturn(imported);
+        given(documentService.importFromRag(eq(ragId), any())).willReturn(List.of(imported));
 
         mockMvc.perform(post("/documents/import/rag/{ragDocumentId}", ragId))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(ID));
+                .andExpect(jsonPath("$[0].id").value(ID));
     }
 
     @Test
